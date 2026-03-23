@@ -1,0 +1,6 @@
+{
+  "name": "remoting",
+  "description": "Expose Claude Code terminal as a public web terminal via Cloudflare tunnel. Users can access and interact with your terminal from any browser.",
+  "version": "1.0.0",
+  "keywords": ["tunnel", "terminal", "web", "remote", "cloudflare", "ttyd"]
+}
