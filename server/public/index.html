@@ -78,10 +78,9 @@
 
     terminal.open(document.getElementById('terminal'));
 
-    // Determine WebSocket port from current location
-    const wsPort = window.location.port === '7681' ? '7682' : '7682';
+    // WebSocket URL: use same host/protocol, just different path
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:${wsPort}`;
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
 
     let ws;
 

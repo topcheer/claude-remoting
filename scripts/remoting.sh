@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# remoting.sh - Start Claude Code as a public web terminal via Cloudflare tunnel
+# remoting.sh - Start Claude Code as a public web terminal via localhost.run
 # Usage: remoting.sh [port]
 
 set -euo pipefail
@@ -13,9 +13,9 @@ if ! command -v node &>/dev/null; then
   exit 1
 fi
 
-# Check cloudflared
-if ! command -v cloudflared &>/dev/null; then
-  echo "MISSING:cloudflared:brew install cloudflared"
+# Check ssh
+if ! command -v ssh &>/dev/null; then
+  echo "MISSING:ssh:Install openssh"
   exit 1
 fi
 
@@ -30,7 +30,7 @@ fi
 
 # Start server
 cd "$SERVER_DIR"
-PORT=$PORT WS_PORT=$((PORT + 1)) node server.js &
+PORT=$PORT node server.js &
 SERVER_PID=$!
 
 sleep 2
@@ -40,16 +40,16 @@ if ! kill -0 "$SERVER_PID" 2>/dev/null; then
   exit 1
 fi
 
-# Start cloudflared (nohup to keep it running)
+# Start tunnel using localhost.run
 echo "Starting tunnel..."
-nohup cloudflared tunnel --url "http://localhost:$PORT" > /tmp/cf.log 2>&1 &
-CF_PID=$!
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -T -R 80:localhost:$PORT localhost.run 2>&1 | tee /tmp/ssh-tunnel.log &
+SSH_PID=$!
 
 # Wait for URL with timeout
 URL=""
-for i in $(seq 1 20); do
+for i in $(seq 1 30); do
   sleep 1
-  URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cf.log 2>/dev/null | head -1)
+  URL=$(grep -oE 'https://[a-z0-9.-]+\.lhr\.life' /tmp/ssh-tunnel.log 2>/dev/null | head -1)
   if [ -n "$URL" ]; then
     break
   fi
@@ -57,15 +57,16 @@ done
 
 if [ -z "$URL" ]; then
   echo "ERROR: Failed to get tunnel URL"
-  cat /tmp/cf.log
+  cat /tmp/ssh-tunnel.log
   kill "$SERVER_PID" 2>/dev/null
+  kill "$SSH_PID" 2>/dev/null
   exit 1
 fi
 
 # Save state
 cat > /tmp/remoting-pids <<EOF
 SERVER_PID=$SERVER_PID
-CF_PID=$CF_PID
+SSH_PID=$SSH_PID
 PORT=$PORT
 URL=$URL
 STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)

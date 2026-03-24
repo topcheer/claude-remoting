@@ -3,25 +3,27 @@ import { WebSocketServer } from 'ws';
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { createServer } from 'http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || 7681;
-const WS_PORT = process.env.WS_PORT || 7682;
 
-// Express server for static files
+// Express app for static files
 const app = express();
 app.use(express.static(join(__dirname, 'public')));
 
-app.listen(PORT, () => {
+// Create HTTP server with Express
+const server = createServer(app);
+
+// WebSocket server attached to HTTP server
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+server.listen(PORT, () => {
   console.log(`HTTP server listening on port ${PORT}`);
+  console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
 });
-
-// WebSocket server for terminal I/O
-const wss = new WebSocketServer({ port: WS_PORT });
-
-console.log(`WebSocket server listening on port ${WS_PORT}`);
 
 wss.on('connection', (ws) => {
   console.log('Client connected');
