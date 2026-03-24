@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Remoting</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #0d1117;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    #terminal {
+      flex: 1;
+      padding: 8px;
+    }
+    .status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: system-ui, sans-serif;
+    }
+    .status.connected {
+      background: #238636;
+      color: white;
+    }
+    .status.disconnected {
+      background: #da3633;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="status" class="status disconnected">未连接</div>
+  <div id="terminal"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+
+    // Initialize xterm.js
+    const terminal = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#0d1117',
+        foreground: '#c9d1d9',
+        cursor: '#c9d1d9',
+        black: '#484f58',
+        red: '#ff7b72',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#b1bac4',
+        brightBlack: '#6e7681',
+        brightRed: '#ffa198',
+        brightGreen: '#56d364',
+        brightYellow: '#e3b341',
+        brightBlue: '#79c0ff',
+        brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd',
+        brightWhite: '#f0f6fc',
+      },
+    });
+
+    terminal.open(document.getElementById('terminal'));
+
+    // Determine WebSocket port from current location
+    const wsPort = window.location.port === '7681' ? '7682' : '7682';
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:${wsPort}`;
+
+    let ws;
+
+    function connect() {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        statusEl.textContent = '已连接';
+        statusEl.className = 'status connected';
+        terminal.focus();
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'data') {
+          terminal.write(msg.data);
+        } else if (msg.type === 'exit') {
+          terminal.write('\r\n\n[Claude Code 已退出]');
+          statusEl.textContent = '已断开';
+          statusEl.className = 'status disconnected';
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = '未连接';
+        statusEl.className = 'status disconnected';
+        // Attempt to reconnect after 3 seconds
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+      };
+
+      // Send user input to pty
+      terminal.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data }));
+        }
+      });
+
+      // Send terminal resize to pty
+      terminal.onResize(({ cols, rows }) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+    }
+
+    // Start connection
+    connect();
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      terminal.resize();
+    });
+  </script>
+</body>
+</html>

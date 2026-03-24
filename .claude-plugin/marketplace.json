@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "remoting",
-      "description": "Expose Claude Code terminal as a public web terminal via Cloudflare tunnel",
+      "description": "Expose Claude Code as a public web terminal via Cloudflare tunnel with full session persistence and real-time interaction",
       "source": "./",
       "category": "productivity",
       "homepage": "https://github.com/topcheer/claude-remoting"

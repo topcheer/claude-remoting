@@ -16,6 +16,13 @@ source "$PID_FILE"
 
 stopped=0
 
+# Stop server (was TTYD_PID, now SERVER_PID)
+if [ -n "${SERVER_PID:-}" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+  kill "$SERVER_PID" 2>/dev/null || true
+  stopped=1
+fi
+
+# Fallback for old PID files that still use TTYD_PID
 if [ -n "${TTYD_PID:-}" ] && kill -0 "$TTYD_PID" 2>/dev/null; then
   kill "$TTYD_PID" 2>/dev/null || true
   stopped=1
