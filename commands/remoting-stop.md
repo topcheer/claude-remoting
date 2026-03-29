@@ -1,22 +1,14 @@
 ---
-description: "Remoting runs in foreground - use Ctrl+C to stop"
+description: "Stop the running remoting browser mirror session"
+allowed-tools: ["Bash(${CLAUDE_PLUGIN_ROOT}/scripts/remoting-stop.sh:*)"]
 ---
 
-# /remoting-stop - Stop Browser Mirror
+# /remoting-stop
 
-The remoting session runs in the foreground in your terminal.
+Execute the stop script:
 
-## To stop:
+```!
+"${CLAUDE_PLUGIN_ROOT}/scripts/remoting-stop.sh"
+```
 
-- Press **Ctrl+C** in the terminal where `/remoting` is running
-- Or exit Claude Code by typing `/exit` in the session
-
-There is no background process to kill.
-
-## Steps:
-
-1. Run the stop script for confirmation:
-
-$ "${CLAUDE_PLUGIN_ROOT}/scripts/remoting-stop.sh"
-
-2. Inform the user: The remoting session runs in the foreground. Press Ctrl+C to stop it, or exit Claude Code normally.
+Then tell the user: The remoting session runs in the foreground. Press Ctrl+C to stop it, or type /exit in Claude Code.
