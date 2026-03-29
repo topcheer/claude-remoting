@@ -6,6 +6,7 @@
   <title>Claude Code Remoting</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <style>
     * {
       margin: 0;
@@ -20,7 +21,14 @@
     }
     #terminal {
       flex: 1;
-      padding: 8px;
+      padding: 4px;
+    }
+    #error-container {
+      color: #da3633;
+      padding: 20px;
+      font-family: system-ui, sans-serif;
+      font-size: 16px;
+      display: none;
     }
     .status {
       position: fixed;
@@ -30,6 +38,7 @@
       border-radius: 4px;
       font-size: 12px;
       font-family: system-ui, sans-serif;
+      z-index: 100;
     }
     .status.connected {
       background: #238636;
@@ -39,14 +48,33 @@
       background: #da3633;
       color: white;
     }
+    .status.connecting {
+      background: #d29922;
+      color: white;
+    }
   </style>
 </head>
 <body>
-  <div id="status" class="status disconnected">未连接</div>
+  <div id="status" class="status connecting">Connecting...</div>
+  <div id="error-container"></div>
   <div id="terminal"></div>
 
   <script>
     const statusEl = document.getElementById('status');
+    const terminalEl = document.getElementById('terminal');
+    const errorEl = document.getElementById('error-container');
+
+    // Extract session ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session');
+
+    if (!sessionId) {
+      errorEl.textContent = 'Error: No session ID in URL. Use the URL shown in the terminal.';
+      errorEl.style.display = 'block';
+      statusEl.textContent = 'No Session';
+      statusEl.className = 'status disconnected';
+      throw new Error('No session ID');
+    }
 
     // Initialize xterm.js
     const terminal = new Terminal({
@@ -76,66 +104,99 @@
       },
     });
 
-    terminal.open(document.getElementById('terminal'));
+    terminal.open(terminalEl);
 
-    // WebSocket URL: use same host/protocol, just different path
+    // Fit addon for auto-sizing
+    let fitAddon = null;
+    try {
+      fitAddon = new FitAddon.FitAddon();
+      terminal.loadAddon(fitAddon);
+      fitAddon.fit();
+    } catch (_) {}
+
+    // WebSocket connection
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-
-    let ws;
+    let activeWs = null;
+    let dead = false;
 
     function connect() {
-      ws = new WebSocket(wsUrl);
+      if (dead) return;
+
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        statusEl.textContent = '已连接';
-        statusEl.className = 'status connected';
-        terminal.focus();
+        ws.send(JSON.stringify({ type: 'auth', sessionId: sessionId }));
       };
 
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+
+        if (msg.type === 'auth_ok') {
+          activeWs = ws;
+          statusEl.textContent = 'Connected';
+          statusEl.className = 'status connected';
+          terminal.focus();
+          if (fitAddon) fitAddon.fit();
+          // Send initial terminal size to server PTY
+          if (terminal.cols && terminal.rows) {
+            ws.send(JSON.stringify({ type: 'resize', cols: terminal.cols, rows: terminal.rows }));
+          }
+          return;
+        }
+
         if (msg.type === 'data') {
           terminal.write(msg.data);
-        } else if (msg.type === 'exit') {
-          terminal.write('\r\n\n[Claude Code 已退出]');
-          statusEl.textContent = '已断开';
+          return;
+        }
+
+        if (msg.type === 'history') {
+          terminal.write(msg.data);
+          return;
+        }
+
+        if (msg.type === 'exit') {
+          terminal.write('\r\n\n[Claude Code has exited]');
+          statusEl.textContent = 'Session ended';
           statusEl.className = 'status disconnected';
+          dead = true;
+          return;
         }
       };
 
-      ws.onclose = () => {
-        statusEl.textContent = '未连接';
-        statusEl.className = 'status disconnected';
-        // Attempt to reconnect after 3 seconds
+      ws.onclose = (event) => {
+        if (ws === activeWs) activeWs = null;
+        if (event.code === 4003 || event.code === 4001) {
+          statusEl.textContent = 'Session expired';
+          statusEl.className = 'status disconnected';
+          dead = true;
+          return;
+        }
+        statusEl.textContent = 'Reconnecting...';
+        statusEl.className = 'status connecting';
         setTimeout(connect, 3000);
       };
 
-      ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
+      ws.onerror = () => {
+        // onclose handles reconnection
       };
-
-      // Send user input to pty
-      terminal.onData((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'input', data }));
-        }
-      });
-
-      // Send terminal resize to pty
-      terminal.onResize(({ cols, rows }) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-        }
-      });
     }
 
-    // Start connection
+    // Register input handler once, outside connect()
+    terminal.onData((data) => {
+      if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+        activeWs.send(JSON.stringify({ type: 'input', data }));
+      }
+    });
+
     connect();
 
-    // Handle window resize
+    // Handle window resize → notify PTY
     window.addEventListener('resize', () => {
-      terminal.resize();
+      if (fitAddon) fitAddon.fit();
+      if (activeWs && activeWs.readyState === WebSocket.OPEN && terminal.cols && terminal.rows) {
+        activeWs.send(JSON.stringify({ type: 'resize', cols: terminal.cols, rows: terminal.rows }));
+      }
     });
   </script>
 </body>

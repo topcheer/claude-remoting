@@ -14,6 +14,9 @@ const PORT = process.env.PORT || 7681;
 const SESSION_ID = randomUUID();
 const clients = new Set();
 
+// Buffer all PTY output so new clients can catch up
+const outputBuffer = [];
+
 // ============================================================
 // HTTP + WebSocket Server
 // ============================================================
@@ -44,6 +47,11 @@ wss.on('connection', (ws) => {
           clearTimeout(authTimeout);
           clients.add(ws);
           ws.send(JSON.stringify({ type: 'auth_ok' }));
+          // Send all cached output to the new client
+          if (outputBuffer.length > 0) {
+            const history = JSON.stringify({ type: 'history', data: outputBuffer.join('') });
+            ws.send(history);
+          }
         } else {
           ws.close(4003, 'Invalid session');
         }
@@ -94,6 +102,9 @@ const ptyProcess = spawn('claude', [], {
 
 // PTY output → local terminal + all WebSocket clients
 ptyProcess.onData((data) => {
+  // Cache output for new clients
+  outputBuffer.push(data);
+
   // Local terminal
   process.stdout.write(data);
 
@@ -172,19 +183,67 @@ function cleanup() {
 }
 
 // ============================================================
-// Start server + auto-open browser
+// Start server + auto-open browser + public tunnel
 // ============================================================
 server.listen(PORT, () => {
-  const url = `http://localhost:${PORT}?session=${SESSION_ID}`;
+  const localUrl = `http://localhost:${PORT}?session=${SESSION_ID}`;
 
-  // Show URL in terminal (clickable in most modern terminals)
-  process.stderr.write(`\n[remoting] ${url}\n\n`);
+  // Show local URL in terminal
+  process.stderr.write(`\n[remoting] ${localUrl}\n`);
 
-  // Auto-open browser
-  const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
-  execFile(cmd, [url], (err) => {
-    if (err) {
-      process.stderr.write(`[remoting] Could not auto-open browser. Open manually: ${url}\n`);
+  // Start localhost.run tunnel for public access
+  // Browser opens only after tunnel is ready
+  startTunnel(localUrl);
+});
+
+function startTunnel(localUrl) {
+  const tunnel = spawn('ssh', [
+    '-o', 'StrictHostKeyChecking=no',
+    '-R', `80:localhost:${PORT}`,
+    'nokey@localhost.run',
+  ], {
+    name: 'xterm-256color',
+    cols: 120,
+    rows: 24,
+  });
+
+  let publicUrl = '';
+  let browserOpened = false;
+
+  tunnel.onData((data) => {
+    const text = data.toString();
+
+    // Match: "xxxxx.lhr.life tunneled with tls termination, https://xxxxx.lhr.life"
+    const match = text.match(/tunneled with tls termination,\s*(https:\/\/\S+)/);
+    if (match && !publicUrl) {
+      publicUrl = match[1];
+      const fullUrl = `${publicUrl}?session=${SESSION_ID}`;
+      process.stderr.write(`[remoting] ${fullUrl}\n\n`);
+
+      // Open browser with public URL (only once, after tunnel is ready)
+      if (!browserOpened) {
+        browserOpened = true;
+        const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+        execFile(cmd, [fullUrl], (err) => {
+          if (err) {
+            process.stderr.write(`[remoting] Could not auto-open browser. Open manually: ${fullUrl}\n`);
+          }
+        });
+      }
     }
   });
-});
+
+  tunnel.onExit(({ exitCode }) => {
+    if (!browserOpened) {
+      // Tunnel failed — fall back to opening local URL
+      process.stderr.write(`[remoting] Tunnel failed (code ${exitCode}). Opening local URL instead.\n`);
+      const cmd = process.platform === 'darwin' ? 'open' : 'xdg-open';
+      execFile(cmd, [localUrl]);
+    }
+  });
+
+  // Clean up tunnel on exit
+  process.on('exit', () => {
+    try { tunnel.kill(); } catch (_) {}
+  });
+}

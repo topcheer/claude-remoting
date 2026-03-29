@@ -1,20 +1,22 @@
 ---
-description: "Stop the running web terminal and Cloudflare tunnel"
+description: "Remoting runs in foreground - use Ctrl+C to stop"
 ---
 
-# /remoting-stop - Stop Web Terminal
+# /remoting-stop - Stop Browser Mirror
 
-Stop the remoting web terminal and Cloudflare tunnel that were started with /remoting.
+The remoting session runs in the foreground in your terminal.
+
+## To stop:
+
+- Press **Ctrl+C** in the terminal where `/remoting` is running
+- Or exit Claude Code by typing `/exit` in the session
+
+There is no background process to kill.
 
 ## Steps:
 
-1. Run the stop script:
+1. Run the stop script for confirmation:
 
-```!
-"${CLAUDE_PLUGIN_ROOT}/scripts/remoting-stop.sh"
-```
+$ "${CLAUDE_PLUGIN_ROOT}/scripts/remoting-stop.sh"
 
-2. Display the result:
-- If `STOPPED`: Inform the user the web terminal has been stopped and the tunnel is closed. If a URL was shown, mention it.
-- If `NO_SESSION`: Inform the user there is no active remoting session.
-- If `NOT_RUNNING`: Inform the user the processes were not found (may have been stopped already).
+2. Inform the user: The remoting session runs in the foreground. Press Ctrl+C to stop it, or exit Claude Code normally.
