@@ -1,6 +1,6 @@
 {
   "name": "@zhanju/remotego",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Expose any CLI tool as a public web terminal via tunnel",
   "bin": {
     "remotego": "bin/remotego.js"
