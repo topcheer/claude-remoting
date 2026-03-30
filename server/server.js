@@ -14,6 +14,12 @@ const PORT = process.env.PORT || 7681;
 const SESSION_ID = randomUUID();
 const clients = new Set();
 
+// Command to run in PTY — configurable via env vars
+const REMOTE_CMD = process.env.REMOTE_CMD || 'claude';
+const REMOTE_ARGS = process.env.REMOTE_ARGS
+  ? JSON.parse(process.env.REMOTE_ARGS)
+  : [];
+
 // Buffer all PTY output so new clients can catch up
 const outputBuffer = [];
 
@@ -86,17 +92,17 @@ wss.on('connection', (ws) => {
 });
 
 // ============================================================
-// Singleton PTY: wraps claude
+// Singleton PTY: wraps the configured command
 // ============================================================
 // Track the largest viewport so PTY matches browser
 let ptyCols = 120;
 let ptyRows = 36;
 
-const ptyProcess = spawn('claude', [], {
+const ptyProcess = spawn(REMOTE_CMD, REMOTE_ARGS, {
   name: 'xterm-256color',
   cols: ptyCols,
   rows: ptyRows,
-  cwd: process.env.CLAUDE_CWD || process.cwd(),
+  cwd: process.env.REMOTE_CWD || process.cwd(),
   env: { ...process.env },
 });
 
@@ -189,7 +195,8 @@ server.listen(PORT, () => {
   const localUrl = `http://localhost:${PORT}?session=${SESSION_ID}`;
 
   // Show local URL in terminal
-  process.stderr.write(`\n[remoting] ${localUrl}\n`);
+  process.stderr.write(`\n[remoting] Command: ${REMOTE_CMD} ${REMOTE_ARGS.join(' ')}\n`);
+  process.stderr.write(`[remoting] ${localUrl}\n`);
 
   // Start localhost.run tunnel for public access
   // Browser opens only after tunnel is ready

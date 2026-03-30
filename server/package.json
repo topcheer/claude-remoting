@@ -1,7 +1,7 @@
 {
   "name": "remoting-server",
   "version": "1.0.0",
-  "description": "WebSocket server for Claude Code remoting",
+  "description": "WebSocket PTY server for remotego",
   "main": "server.js",
   "type": "module",
   "scripts": {

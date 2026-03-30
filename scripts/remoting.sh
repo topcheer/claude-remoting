@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# remoting.sh - Mirror Claude Code terminal in a browser
+# remoting.sh - Mirror a CLI tool in a browser (Claude plugin default: claude)
 # Usage: remoting.sh [port]
 
 set -euo pipefail
@@ -23,8 +23,8 @@ if [ ! -d "$SERVER_DIR/node_modules" ]; then
 fi
 
 # Start server in foreground -- replaces this shell process
-# server.js wraps claude in a PTY and mirrors to browser
-# Save caller's cwd so claude starts in the right directory
-CLAUDE_CWD="$(pwd)"
+# Default command is 'claude' for the Claude plugin
+# Save caller's cwd so the command starts in the right directory
+REMOTE_CWD="$(pwd)"
 cd "$SERVER_DIR"
-exec env PORT="$PORT" CLAUDE_CWD="$CLAUDE_CWD" node server.js
+exec env PORT="$PORT" REMOTE_CMD="claude" REMOTE_ARGS="[]" REMOTE_CWD="$REMOTE_CWD" node server.js
