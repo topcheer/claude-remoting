@@ -12,6 +12,7 @@ const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || 7681;
 const SESSION_ID = randomUUID();
+const TUNNEL_DOMAIN = process.env.TUNNEL_DOMAIN || '';
 const clients = new Set();
 
 // Command to run in PTY — configurable via env vars
@@ -204,9 +205,14 @@ server.listen(PORT, () => {
 });
 
 function startTunnel(localUrl) {
+  // Build SSH -R argument: custom domain or random subdomain
+  const remoteArg = TUNNEL_DOMAIN
+    ? `${TUNNEL_DOMAIN}:80:localhost:${PORT}`
+    : `80:localhost:${PORT}`;
+
   const tunnel = spawn('ssh', [
     '-o', 'StrictHostKeyChecking=no',
-    '-R', `80:localhost:${PORT}`,
+    '-R', remoteArg,
     'nokey@localhost.run',
   ], {
     name: 'xterm-256color',

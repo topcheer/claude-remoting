@@ -5,7 +5,7 @@ Expose any CLI tool as a public web terminal via tunnel.
 ## Install
 
 ```bash
-npm install -g @zhanju/remotego
+npm install -g @remotego/remotego
 ```
 
 ## Usage
@@ -20,6 +20,7 @@ remotego <command> [command-args...] [options]
 |--------|-------------|---------|
 | `--port <port>` | Port to listen on | `7681` |
 | `--cwd <dir>` | Working directory for the command | Current directory |
+| `--domain <domain>` | Custom domain for localhost.run tunnel | Random subdomain |
 | `--help, -h` | Show help | |
 
 ### Examples
@@ -39,6 +40,9 @@ remotego vim
 
 # Custom port
 remotego --port 9000 node
+
+# Custom tunnel domain
+remotego --domain myterm.localhost.run bash
 
 # Pass flags to the command (use -- to separate)
 remotego -- git log --oneline

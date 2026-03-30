@@ -29,6 +29,8 @@ function parseArgs(argv) {
       flags.port = argv[++i];
     } else if (arg === '--cwd' && argv[i + 1]) {
       flags.cwd = argv[++i];
+    } else if (arg === '--domain' && argv[i + 1]) {
+      flags.domain = argv[++i];
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -62,17 +64,19 @@ Usage:
   remotego claude
 
 Options:
-  --port <port>   Port to listen on (default: 7681)
-  --cwd <dir>     Working directory for the command (default: current dir)
-  --help, -h      Show this help message
+  --port <port>       Port to listen on (default: 7681)
+  --cwd <dir>         Working directory for the command (default: current dir)
+  --domain <domain>   Custom domain for localhost.run tunnel (default: random)
+  --help, -h          Show this help message
 
 Examples:
-  remotego claude              # Mirror Claude Code
-  remotego vim                 # Mirror vim editor
-  remotego bash                # Mirror a bash shell
-  remotego python3 -i          # Mirror Python REPL
-  remotego --port 9000 node    # Mirror Node.js REPL on port 9000
-  remotego -- --flagged-arg    # Use -- to separate flags from command args
+  remotego claude                        # Mirror Claude Code
+  remotego vim                           # Mirror vim editor
+  remotego bash                          # Mirror a bash shell
+  remotego python3 -i                    # Mirror Python REPL
+  remotego --port 9000 node              # Mirror Node.js REPL on port 9000
+  remotego --domain myterm.localhost.run bash  # Custom tunnel domain
+  remotego -- --flagged-arg              # Use -- to separate flags from command args
 `);
 }
 
@@ -96,6 +100,10 @@ const env = {
 
 if (flags.port) {
   env.PORT = flags.port;
+}
+
+if (flags.domain) {
+  env.TUNNEL_DOMAIN = flags.domain;
 }
 
 // Install server dependencies if needed

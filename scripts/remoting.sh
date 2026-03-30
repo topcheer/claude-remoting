@@ -1,11 +1,21 @@
 #!/bin/bash
 
 # remoting.sh - Mirror a CLI tool in a browser (Claude plugin default: claude)
-# Usage: remoting.sh [port]
+# Usage: remoting.sh [port] [--domain <domain>]
 
 set -euo pipefail
 
-PORT="${1:-7681}"
+PORT="7681"
+DOMAIN=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --domain)
+      DOMAIN="$2"; shift 2 ;;
+    *)
+      PORT="$1"; shift ;;
+  esac
+done
 
 # Check Node.js
 if ! command -v node &>/dev/null; then
@@ -27,4 +37,11 @@ fi
 # Save caller's cwd so the command starts in the right directory
 REMOTE_CWD="$(pwd)"
 cd "$SERVER_DIR"
-exec env PORT="$PORT" REMOTE_CMD="claude" REMOTE_ARGS="[]" REMOTE_CWD="$REMOTE_CWD" node server.js
+
+# Build tunnel domain env var if specified
+TUNNEL_ENV=""
+if [ -n "$DOMAIN" ]; then
+  TUNNEL_ENV="TUNNEL_DOMAIN=$DOMAIN"
+fi
+
+exec env PORT="$PORT" REMOTE_CMD="claude" REMOTE_ARGS="[]" REMOTE_CWD="$REMOTE_CWD" $TUNNEL_ENV node server.js
